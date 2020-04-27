@@ -21,29 +21,40 @@ export class HtmlWebpackExtraInjectPlugin {
     validateOptions(schema, opts);
   }
 
+  // eslint-disable-next-line @typescript-eslint/typedef,@typescript-eslint/no-untyped-public-signature,@typescript-eslint/explicit-function-return-type
+  alterAssetTags(data) {
+    const tag = {
+      tagName: 'script',
+      attributes: {},
+      innerHTML: HTML_TOKEN,
+      voidTag: false,
+    };
+    if (data.assetTags) {
+      data.assetTags.scripts.unshift(tag);
+    } else {
+      data.body.unshift(tag);
+    }
+    return data;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/typedef,@typescript-eslint/no-untyped-public-signature,@typescript-eslint/explicit-function-return-type
+  inject(data) {
+    data.html = data.html.replace(`<script>${HTML_TOKEN}</script>`, this.opts.inject);
+    return data;
+  }
+
   apply(compiler: webpack.Compiler): void {
     compiler.hooks.compilation.tap(PLUGIN_NAME, (compilation) => {
       // html-webpack-plugin v4
       if ((HtmlWebpackPlugin as any).getHooks) {
-        HtmlWebpackPlugin.getHooks(compilation).alterAssetTags.tap(PLUGIN_NAME, (data) => {
-          data.assetTags.scripts.unshift({
-            tagName: 'script',
-            attributes: {},
-            innerHTML: HTML_TOKEN,
-            voidTag: false,
-          });
-          return data;
-        });
-        HtmlWebpackPlugin.getHooks(compilation).beforeEmit.tap(PLUGIN_NAME, (data) => {
-          data.html = data.html.replace(`<script>${HTML_TOKEN}</script>`, this.opts.inject);
-          return data;
-        });
+        const hooks = HtmlWebpackPlugin.getHooks(compilation);
+        hooks.alterAssetTags.tap(PLUGIN_NAME, this.alterAssetTags);
+        hooks.beforeEmit.tap(PLUGIN_NAME, this.inject.bind(this));
       } else {
         // html-webpack-plugin v3
-        (compilation.hooks as any).htmlWebpackPluginBeforeHtmlProcessing.tap(PLUGIN_NAME, (data) => {
-          data.html += this.opts.inject;
-          return data;
-        });
+        const hooks = compilation.hooks as any;
+        hooks.htmlWebpackPluginAlterAssetTags.tap(PLUGIN_NAME, this.alterAssetTags);
+        hooks.htmlWebpackPluginAfterHtmlProcessing.tap(PLUGIN_NAME, this.inject.bind(this));
       }
     });
   }
