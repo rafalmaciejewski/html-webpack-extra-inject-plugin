@@ -1,0 +1,3 @@
+interface HtmlWebpackExtraInjectPluginOptions {
+    inject: string;
+}
